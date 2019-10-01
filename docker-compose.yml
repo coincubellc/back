@@ -1,0 +1,174 @@
+version: '3'
+
+services:
+  flask:
+    container_name: flask
+    build: ./back-end
+    command: ./back-end/app.py
+    ports:
+      - "443:443"
+    volumes:
+      - ./back-end:/back-end
+    hostname: flask
+    restart: always
+    environment:
+      PYTHONUNBUFFERED: 1
+      SQLALCHEMY_DATABASE_URI: mysql://admin:4pa1z&ABK78R@mysql/coincube
+      EXAPI_URL: http://exapi:9000
+      VAULT_SEED: ''
+      FLASK_DEBUG: 1
+      PORT: 443
+      HOST: '0.0.0.0'
+    networks:
+      - back
+
+  exapi:
+    build: ./exapi
+    environment:
+      PORT: 9000
+      PYTHONUNBUFFERED: 1
+    ports:
+      - "9000:9000"
+    restart: always
+    networks:
+      - back
+
+  celery_cron_job:
+    build: ./cron-job
+    volumes:
+      - .:/code
+    environment:
+      PYTHONUNBUFFERED: 1
+      COMPOSE_HTTP_TIMEOUT: 300
+      SQLALCHEMY_DATABASE_URI: mysql://admin:4pa1z&ABK78R@mysql/coincube
+      CELERY_BROKER_URL: redis://redis-cron:6379
+      EXAPI_URL: http://exapi:9000
+      CMC_API_KEY: ''
+      CMC_LIMIT: 500
+    command: >
+      /opt/conda/bin/celery worker
+      --app celery_update
+      --hostname %h-%n
+      --loglevel DEBUG
+      --concurrency 10
+    depends_on:
+      - redis-cron
+      - exapi
+      - mysql
+    networks:
+      - redis-cron-net
+      - back
+
+  celery_scheduler:
+    build: ./cron-job
+    volumes:
+      - .:/code
+    environment:
+      PYTHONUNBUFFERED: 1
+      COMPOSE_HTTP_TIMEOUT: 300
+      SQLALCHEMY_DATABASE_URI: mysql://admin:4pa1z&ABK78R@mysql/coincube
+      CELERY_BROKER_URL: redis://redis-cron:6379
+      EXAPI_URL: http://exapi:9000
+      CMC_API_KEY: ''
+      CMC_LIMIT: 500
+    command: >
+      /opt/conda/bin/celery
+      -A celery_update beat
+      --loglevel DEBUG
+    depends_on:
+      - redis-cron
+      - exapi
+      - mysql
+    networks:
+      - redis-cron-net
+      - back
+
+  trader_scheduler:
+    build: ./trade-engine
+    environment:
+      PYTHONUNBUFFERED: 1
+      COMPOSE_HTTP_TIMEOUT: 300
+      SQLALCHEMY_DATABASE_URI: mysql://admin:4pa1z&ABK78R@mysql/coincube
+      CELERY_BROKER_URL: redis://redis:6379
+      EXAPI_URL: http://exapi:9000
+    command: >
+      /opt/conda/bin/celery
+      -A celery_update beat
+      --loglevel DEBUG
+    depends_on:
+      - redis
+      - exapi
+    networks:
+      - redis-net
+      - back
+
+  trader:
+    build: ./trade-engine
+    environment:
+      PYTHONUNBUFFERED: 1
+      COMPOSE_HTTP_TIMEOUT: 300
+      SQLALCHEMY_DATABASE_URI: mysql://admin:4pa1z&ABK78R@mysql/coincube
+      CELERY_BROKER_URL: redis://redis:6379
+      EXAPI_URL: http://exapi:9000
+      VAULT_SEED: ''
+    command: >
+      /opt/conda/bin/celery worker
+      --app celery_update
+      --hostname %h-%n
+      --loglevel DEBUG
+      --concurrency 5
+    depends_on:
+      - redis
+      - exapi
+    networks:
+      - redis-net
+      - back
+
+  mysql:
+    image: mariadb
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    environment:
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: 4pa1z&ABK78R
+      MYSQL_ROOT_PASSWORD: 4pa1z&ABK78R
+      MYSQL_DATABASE: coincube
+    restart: always
+    networks:
+      - back
+
+  redis:
+    image: redis:4.0.5-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    hostname: redis
+    expose:
+      - 6379
+    networks:
+      - redis-net
+    volumes:
+      - redis-data:/data
+
+  redis-cron:
+    image: redis:4.0.5-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    hostname: redis-cron
+    expose:
+      - 6379
+    networks:
+      - redis-cron-net
+    volumes:
+      - redis-cron-data:/data
+
+volumes:
+  mysql-data:
+    driver: local
+  redis-data:
+  redis-cron-data:
+
+networks:
+  back:
+    driver: bridge
+  redis-net:
+  redis-cron-net:

@@ -1,0 +1,12 @@
+[submodule "exapi"]
+	path = exapi
+	url = https://github.com/coincubellc/exapi
+[submodule "back-end"]
+	path = back-end
+	url = https://github.com/coincubellc/back-end
+[submodule "cron-job"]
+	path = cron-job
+	url = https://github.com/coincubellc/cron-job
+[submodule "trade-engine"]
+	path = trade-engine
+	url = https://github.com/coincubellc/trade-engine
