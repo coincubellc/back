@@ -46,7 +46,7 @@ git submodule update --recursive --remote
 3. These two lines should look something like: `VAULT_SEED: 'b'LS0tLS1CRUdJTiBSU0......TVV6UWh3PT0KLS0tLS1FTkQgUlNBIFBSSVZBVEUgS0VZLS0tLS0='`
 4. Save `docker-compose.yml`.
 
-## >Docker Setup
+## Docker Setup
 You will need <a href="https://docker.com" target="_blank">Docker</a>.
 
 Build the Docker container(s):
